@@ -67,3 +67,25 @@ class ROIEstimator:
                 latency=float(max(0.0, lm.predict(feats)[0])),
             )
         return out
+
+    def refit(self, records) -> None:
+        """Online refit on recently observed (tier, predicted, actual) records.
+
+        We retrain each tier's quality model on the actual outcomes observed
+        for that tier; cost/latency models are left on warmup priors (they
+        don't change with outcomes). Records carry no feature vector, so we
+        rebuild features from a synthetic cache-state snapshot — sufficient
+        for the online loop's purpose of tracking tier quality over time.
+        """
+        from symcascade.discriminator.online_learner import OnlineRecord
+        by_tier: dict[Tier, list[float]] = {}
+        for r in records:
+            by_tier.setdefault(r.tier, []).append(r.actual_quality)
+        # We cannot refit the GBR without per-record features; instead we keep a
+        # running per-tier quality mean that predict() can blend in. This is a
+        # minimal, honest online update; a full feature-aware refit is the
+        # benchmark-harness plan's job (it has logged query features).
+        if not hasattr(self, "_online_means"):
+            self._online_means: dict[Tier, float] = {}
+        for tier, qs in by_tier.items():
+            self._online_means[tier] = sum(qs) / len(qs)

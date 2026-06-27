@@ -110,3 +110,57 @@ def test_all_fail_returns_last_result():
     result = cascade.run(_make_query())
     assert result.success is False
     assert result.answer == "last"
+
+
+class ObservingDiscriminator:
+    """Routes to a fixed tier and records observe() calls."""
+    def __init__(self, tier):
+        self._tier = tier
+        self.observed = []
+    def route(self, query, cache_state):
+        return self._tier
+    def observe(self, actual_quality):
+        self.observed.append(actual_quality)
+
+
+def test_observer_hook_calls_observe_after_run():
+    disc = ObservingDiscriminator(Tier.L1)
+    cascade = Cascade(cache=StubCache(hit=False), discriminator=disc,
+                      l1=StubStage(Tier.L1, success=True),
+                      l2=StubStage(Tier.L2), l3=StubStage(Tier.L3),
+                      l4=StubStage(Tier.L4), cache_state_fn=lambda: None)
+    cascade.run(_make_query())
+    assert disc.observed == [1.0]  # success -> quality 1.0
+
+
+def test_observer_hook_uses_quality_fn_when_provided():
+    disc = ObservingDiscriminator(Tier.L1)
+    cascade = Cascade(cache=StubCache(hit=False), discriminator=disc,
+                      l1=StubStage(Tier.L1, success=True),
+                      l2=StubStage(Tier.L2), l3=StubStage(Tier.L3),
+                      l4=StubStage(Tier.L4), cache_state_fn=lambda: None,
+                      quality_fn=lambda r: r.confidence)
+    # StubStage doesn't set confidence, so it defaults to 0.0
+    cascade.run(_make_query())
+    assert disc.observed == [0.0]
+
+
+def test_observer_hook_skipped_on_cache_hit():
+    disc = ObservingDiscriminator(Tier.L1)
+    cascade = Cascade(cache=StubCache(hit=True), discriminator=disc,
+                      l1=StubStage(Tier.L1), l2=StubStage(Tier.L2),
+                      l3=StubStage(Tier.L3), l4=StubStage(Tier.L4),
+                      cache_state_fn=lambda: None)
+    cascade.run(_make_query())
+    assert disc.observed == []  # no observe on cache hit (no tier ran)
+
+
+def test_observer_hook_skipped_when_disc_has_no_observe():
+    # StubDiscriminator has no observe() — Cascade must not crash.
+    disc = StubDiscriminator(Tier.L1)
+    cascade = Cascade(cache=StubCache(hit=False), discriminator=disc,
+                      l1=StubStage(Tier.L1, success=True),
+                      l2=StubStage(Tier.L2), l3=StubStage(Tier.L3),
+                      l4=StubStage(Tier.L4), cache_state_fn=lambda: None)
+    result = cascade.run(_make_query())  # must not raise
+    assert result.success is True
