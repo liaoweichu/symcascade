@@ -1,0 +1,17 @@
+[project]
+name = "symcascade"
+version = "0.1.0"
+description = "Cache-state-aware dual-path discriminative routing cascade"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "scikit-learn>=1.4",
+]
+
+[project.optional-dependencies]
+conformal = ["mapie>=0.8"]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
