@@ -1,0 +1,67 @@
+# SymCascade E1 + E6 experiment config (ALFWorld, full cascade)
+# Run: python -m symcascade.bench.run --config experiments/configs/alfworld_full.yaml
+
+benchmark: alfworld
+n_tasks: 134
+seeds: [42, 1, 2, 3, 4, 5, 6, 7, 8, 9]   # >=10 for Wilcoxon + bootstrap (spec 4.6)
+output_dir: results/e1_alfworld_full/
+
+# --- L0 semantic cache ---
+cache:
+  sim_threshold: 0.9
+  embedder:
+    type: sentence_transformer
+    model: BAAI/bge-m3
+    device: cpu            # set to cuda if GPU available
+
+# --- C2 skeleton cache ---
+skeleton_cache:
+  threshold: 0.75
+  topk: 3
+  hit_window: 100
+
+# --- I1 discriminator ---
+discriminator:
+  alpha: 0.1               # 1-alpha conformal coverage
+  retrain_every: 200
+  sliding_window: 2000
+  ewma_decay: 0.95
+  drift_threshold: 0.3
+  fallback_tier: 4         # L4 on drift
+
+# --- L1 skeleton replanner (symbolic, zero LLM) ---
+l1:
+  fd_timeout: 30
+
+# --- L2 PDDL gen + FD solve ---
+l2:
+  llm: gemma               # use edge Gemma to generate PDDL (1 LLM call)
+  fd_timeout: 30
+  validate_pddl: true      # VAL check before FD
+
+# --- L3 Gemma confidence gate ---
+l3:
+  model: google/gemma-3-12b-it
+  enable_thinking: false   # spec constraint: low-cost tier forces thinking=False
+  confidence_threshold: 0.7
+  # For 8-16GB GPU, use a quantized model instead:
+  # model: google/gemma-3-12b-it-awq
+  # or fall back to a smaller Gemma:
+  # model: google/gemma-2-9b-it
+
+# --- L4 cloud fallback ---
+l4:
+  # Use OpenAI-compatible client (DeepSeek/Qwen/OpenAI/vLLM server).
+  # Set via env: OPENAI_API_KEY, OPENAI_BASE_URL (if non-OpenAI).
+  client: openai_compatible
+  model: deepseek-chat      # change to gpt-4o / qwen-plus / etc. as needed
+  # base_url: https://api.deepseek.com/v1   # uncomment for non-OpenAI
+  cost: 1.0
+  latency_ms: 500.0
+
+# --- E6 self-growth curve sampling ---
+self_growth:
+  window: 20                # rolling window size (requests) for cloud-call rate
+
+# --- progress logging ---
+progress_every: 10
