@@ -5,6 +5,11 @@ GPL isolation: Fast Downward is GPL-3.0. We invoke it as a subprocess via
 SymCascade (Apache-2.0-compatible) free of GPL contamination.
 
 The runner is injectable so tests never need the binary.
+
+Install for real runs: ``pip install fast-downward`` (provides the
+``fast-downward`` CLI) or build from https://github.com/aibasel/downward.
+The default runner shells out to ``fast-downward <domain> <problem>
+--search "lama()"`` and parses the emitted ``sas_plan``.
 """
 from __future__ import annotations
 
